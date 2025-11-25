@@ -75,7 +75,12 @@ func TestHappyPath(t *testing.T) {
 			LongOperation: 2 * time.Second,
 		},
 	}, trMgr, rnd)
-	spec, err := os.ReadFile("openapi.yml")
+	// Определяем путь к openapi.yml относительно корня проекта
+	cwd, err := os.Getwd()
+	require.NoError(t, err)
+	root := filepath.Clean(filepath.Join(cwd, "..", ".."))
+	openapiPath := filepath.Join(root, "openapi.yml")
+	spec, err := os.ReadFile(openapiPath)
 	require.NoError(t, err)
 	h := router.New(svc, spec)
 	server := httptest.NewServer(h.Router())
