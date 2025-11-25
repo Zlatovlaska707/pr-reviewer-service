@@ -31,6 +31,9 @@ import (
 )
 
 func TestHappyPath(t *testing.T) {
+	if testing.Short() {
+		t.Skip("пропуск интеграционного теста в режиме -short")
+	}
 	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip("testcontainers не поддерживается в среде Windows CI")
@@ -44,8 +47,23 @@ func TestHappyPath(t *testing.T) {
 
 	runMigrations(t, dsn)
 
-	pool, err := pgxpool.New(ctx, dsn)
-	require.NoError(t, err)
+	// Подключаемся с повторными попытками для стабильности в CI
+	var pool *pgxpool.Pool
+	var err error
+	for i := 0; i < 5; i++ {
+		pool, err = pgxpool.New(ctx, dsn)
+		if err == nil {
+			err = pool.Ping(ctx)
+			if err == nil {
+				break
+			}
+			pool.Close()
+		}
+		if i < 4 {
+			time.Sleep(time.Second)
+		}
+	}
+	require.NoError(t, err, "failed to connect to database after retries")
 	defer pool.Close()
 
 	repo := repository.New(pool, nower.New())
@@ -116,14 +134,43 @@ func TestHappyPath(t *testing.T) {
 
 func setupPostgres(t *testing.T, ctx context.Context) (*tcpostgres.PostgresContainer, string) {
 	t.Helper()
+	// Увеличиваем таймаут для CI окружения
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+
 	container, err := tcpostgres.Run(ctx, "postgres:16-alpine",
 		tcpostgres.WithDatabase("pr_reviewer"),
 		tcpostgres.WithUsername("postgres"),
 		tcpostgres.WithPassword("postgres"),
 	)
 	require.NoError(t, err)
-	connStr, err := container.ConnectionString(ctx, "sslmode=disable")
-	require.NoError(t, err)
+
+	// Ждём готовности контейнера с повторными попытками
+	var connStr string
+	var lastErr error
+	for i := 0; i < 10; i++ {
+		connStr, err = container.ConnectionString(ctx, "sslmode=disable")
+		if err == nil {
+			// Проверяем подключение
+			pool, testErr := pgxpool.New(ctx, connStr)
+			if testErr == nil {
+				testErr = pool.Ping(ctx)
+				pool.Close()
+				if testErr == nil {
+					return container, connStr
+				}
+				lastErr = testErr
+			} else {
+				lastErr = testErr
+			}
+		} else {
+			lastErr = err
+		}
+		if i < 9 {
+			time.Sleep(time.Second)
+		}
+	}
+	require.NoError(t, lastErr, "failed to connect to postgres container after retries")
 	return container, connStr
 }
 
