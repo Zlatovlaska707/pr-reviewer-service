@@ -1,6 +1,6 @@
 
 run:
-  go: "1.24"
+  # Версия Go из go.mod (1.24)
 
 linters-settings:
   gofmt:
