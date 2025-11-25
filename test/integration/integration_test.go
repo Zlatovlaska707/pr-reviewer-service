@@ -92,6 +92,8 @@ func TestHappyPath(t *testing.T) {
 			{"user_id": "u1", "username": "Alice", "is_active": true},
 			{"user_id": "u2", "username": "Bob", "is_active": true},
 			{"user_id": "u3", "username": "Charlie", "is_active": true},
+			{"user_id": "u4", "username": "David", "is_active": true},
+			{"user_id": "u5", "username": "Eve", "is_active": true},
 		},
 	}
 	resp := doRequest(t, server, http.MethodPost, "/team/add", teamBody)
