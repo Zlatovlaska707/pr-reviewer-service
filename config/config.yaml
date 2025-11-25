@@ -1,0 +1,29 @@
+http:
+  port: "8080"
+  read_timeout: 5s
+  write_timeout: 5s
+  idle_timeout: 5m
+
+database:
+  url: "postgres://postgres:postgres@localhost:5432/pr_reviewer?sslmode=disable"
+  migrations_path: "migrations"
+  max_connections: 50
+  min_connections: 5
+  max_conn_idle_time: 5m
+  max_conn_lifetime: 30m
+
+timeouts:
+  operation: 30s
+  long_operation: 60s
+  shutdown: 10s
+
+logging:
+  level: "info"
+  output: "stdout"
+
+swagger:
+  spec_path: "openapi.yml"
+
+load_tests:
+  targets_path: "load/targets.txt"
+

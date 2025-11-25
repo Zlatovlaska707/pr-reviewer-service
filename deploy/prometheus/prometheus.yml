@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: pr-reviewer-service
+    static_configs:
+      - targets:
+          - app:8080
+

@@ -1,0 +1,50 @@
+
+run:
+  go: "1.24"
+
+linters-settings:
+  gofmt:
+    simplify: true
+  goimports:
+    local-prefixes: pr-reviewer-service_Avito
+  revive:
+    min-confidence: 0
+    rules:
+      - name: exported
+        disabled: false
+      - name: var-naming
+        disabled: false
+      - name: package-comments
+        disabled: true
+  gosec:
+    severity: medium
+    confidence: medium
+
+linters:
+  enable:
+    # Линтеры, работающие без typechecking (безопасны при несовпадении версий Go)
+    - gofmt
+    - goimports
+
+    # Все остальные...
+    - govet
+    - revive
+    - gosec
+    - errcheck
+    - staticcheck
+    - unused
+    - gosimple
+    - ineffassign
+    - typecheck
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gosec
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+
+
