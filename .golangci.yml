@@ -1,14 +1,9 @@
-
-run:
-  # Версия Go из go.mod (1.24)
-
 linters-settings:
   gofmt:
     simplify: true
   goimports:
     local-prefixes: pr-reviewer-service_Avito
   revive:
-    min-confidence: 0
     rules:
       - name: exported
         disabled: false
