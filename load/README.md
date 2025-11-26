@@ -1,134 +1,150 @@
-# Нагрузочное тестирование с Vegeta
+# Load Testing with Vegeta
 
-Этот проект использует библиотеку [Vegeta](https://github.com/tsenart/vegeta) для нагрузочного тестирования API сервиса назначения ревьюверов. Тестирование реализовано как Go-программа в `load/cli/`.
+[🇷🇺 Русский](README.ru.md) | [🇬🇧 English](README.md)
 
-## Быстрый старт
+This project uses the [Vegeta](https://github.com/tsenart/vegeta) library for load testing the PR reviewer assignment service API. Testing is implemented as a Go program in `load/cli/`.
 
-1. Запустите сервис:
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Structure](#structure)
+- [Parameters](#parameters)
+  - [Available Flags](#available-flags)
+  - [Usage Examples](#usage-examples)
+- [Makefile Commands](#makefile-commands)
+- [Testing Scenario](#testing-scenario)
+- [Results Analysis](#results-analysis)
+  - [Text Report](#text-report)
+  - [HTML Graph](#html-graph)
+  - [Detailed Statistics in JSON](#detailed-statistics-in-json)
+- [SLA Requirements](#sla-requirements)
+
+## Quick Start
+
+1. Start the service:
    ```bash
    docker compose up --build
    ```
 
-2. Запустите нагрузочное тестирование:
+2. Run load testing:
    ```bash
    make load-test
    ```
 
-   Или напрямую:
+   Or directly:
    ```bash
    go run ./load/cli
    ```
 
-## Структура
+## Structure
 
-- `load/cli/` — Go-приложение для нагрузочного тестирования
-  - `main.go` — основной код (setup, генерация запросов, запуск Vegeta)
-  - `main_test.go` — unit тесты
-- `load/scripts/` — вспомогательные shell-скрипты (устаревшие, используются для справки)
-  - `setup.sh` — подготовка тестового окружения
-  - `load_test.sh` — запуск нагрузочного теста
-  - `generate_targets.sh` — генерация targets для Vegeta
-- `load/artifacts/` — результаты и артефакты тестов
-  - `results.bin` — бинарный файл с результатами теста
-  - `plot.html` — HTML график результатов (генерируется отдельно)
-  - `vegeta-plot.png` — визуализация результатов
+- `load/cli/` — Go application for load testing
+  - `main.go` — main code (setup, request generation, Vegeta launch)
+  - `main_test.go` — unit tests
+- `load/scripts/` — helper shell scripts (deprecated, used for reference)
+  - `setup.sh` — test environment preparation
+  - `load_test.sh` — load test execution
+  - `generate_targets.sh` — Vegeta targets generation
+- `load/artifacts/` — test results and artifacts
+  - `results.bin` — binary file with test results
+  - `plot.html` — HTML graph of results (generated separately)
+  - `vegeta-plot.png` — results visualization
 
-## Параметры
+## Parameters
 
-Можно настроить через флаги командной строки:
+Can be configured via command-line flags:
 
 ```bash
 go run ./load/cli -url=http://localhost:8080 -rate=5 -duration=60s -team=load-team
 ```
 
-### Доступные флаги
+### Available Flags
 
-| Флаг | Описание | Значение по умолчанию |
+| Flag | Description | Default Value |
 |------|----------|----------------------|
-| `-url` | Base URL сервиса | `http://localhost:8080` |
-| `-rate` | Запросов в секунду | `5` |
-| `-duration` | Длительность теста | `60s` |
-| `-team` | Имя тестовой команды | `load-team` |
-| `-setup-only` | Только подготовка окружения (создание команды) | `false` |
-| `-report` | Показать отчёт из сохранённых результатов | `false` |
-| `-plot` | Показать инструкцию по генерации графика | `false` |
+| `-url` | Base URL of the service | `http://localhost:8080` |
+| `-rate` | Requests per second | `5` |
+| `-duration` | Test duration | `60s` |
+| `-team` | Test team name | `load-team` |
+| `-setup-only` | Only prepare environment (create team) | `false` |
+| `-report` | Show report from saved results | `false` |
+| `-plot` | Show instructions for graph generation | `false` |
 
-### Примеры использования
+### Usage Examples
 
 ```bash
-# Кастомные параметры
+# Custom parameters
 go run ./load/cli -rate=10 -duration=30s
 
-# Только подготовка окружения
+# Only prepare environment
 go run ./load/cli -setup-only
 
-# Показать отчёт из сохранённых результатов
+# Show report from saved results
 go run ./load/cli -report
 
-# Показать инструкцию по генерации графика
+# Show instructions for graph generation
 go run ./load/cli -plot
 ```
 
-## Команды Makefile
+## Makefile Commands
 
-| Команда | Описание |
+| Command | Description |
 |---------|----------|
-| `make load-test` | Запустить полный цикл тестирования (setup + нагрузка) |
-| `make load-test-setup` | Только подготовка окружения (создание команды) |
-| `make load-test-report` | Показать отчёт из сохранённых результатов |
-| `make load-test-plot` | Показать инструкцию по генерации графика |
+| `make load-test` | Run full testing cycle (setup + load) |
+| `make load-test-setup` | Only prepare environment (create team) |
+| `make load-test-report` | Show report from saved results |
+| `make load-test-plot` | Show instructions for graph generation |
 
-## Сценарий тестирования
+## Testing Scenario
 
-1. **Подготовка**: автоматически создаётся команда `load-team` с тремя активными пользователями:
+1. **Preparation**: automatically creates `load-team` with three active users:
    - `lu1` — Load Alice
    - `lu2` — Load Bob
    - `lu3` — Load Carol
 
-2. **Нагрузка**: Vegeta отправляет POST запросы на `/pullRequest/create` с уникальными ID (генерируются на основе `time.Now().UnixNano()` для избежания конфликтов)
+2. **Load**: Vegeta sends POST requests to `/pullRequest/create` with unique IDs (generated based on `time.Now().UnixNano()` to avoid conflicts)
 
-3. **Проверка**: автоматически назначаются ревьюверы из команды автора (до 2 штук)
+3. **Verification**: reviewers are automatically assigned from the author's team (up to 2)
 
-## Анализ результатов
+## Results Analysis
 
-После теста результаты сохраняются в `load/artifacts/results.bin`. Для анализа:
+After the test, results are saved in `load/artifacts/results.bin`. For analysis:
 
-### Текстовый отчёт
+### Text Report
 
 ```bash
-# Через Go-программу
+# Via Go program
 go run ./load/cli -report
 
-# Или через CLI утилиту vegeta (если установлена)
+# Or via vegeta CLI utility (if installed)
 vegeta report load/artifacts/results.bin
 ```
 
-### HTML график
+### HTML Graph
 
 ```bash
-# Установить CLI утилиту vegeta
+# Install vegeta CLI utility
 go install github.com/tsenart/vegeta/v12@latest
 
-# Сгенерировать график
+# Generate graph
 vegeta plot load/artifacts/results.bin > load/artifacts/plot.html
 
-# Открыть в браузере
+# Open in browser
 open load/artifacts/plot.html  # macOS
 xdg-open load/artifacts/plot.html  # Linux
 ```
 
-### Детальная статистика в JSON
+### Detailed Statistics in JSON
 
 ```bash
 vegeta report -type=json load/artifacts/results.bin | jq
 ```
 
-## Требования SLA
+## SLA Requirements
 
-Согласно ТЗ:
-- **RPS**: 5 запросов в секунду
-- **SLI времени ответа**: 300 мс (95-й перцентиль)
-- **SLI успешности**: 99.9%
+According to the requirements:
+- **RPS**: 5 requests per second
+- **Response time SLI**: 300 ms (95th percentile)
+- **Success SLI**: 99.9%
 
-Vegeta автоматически проверяет эти метрики и выводит отчёт. Подробные результаты см. в `load/load-test-report.md`.
-
+Vegeta automatically checks these metrics and outputs a report. Detailed results see in [load testing report](load-test-report.md).

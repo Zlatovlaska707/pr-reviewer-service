@@ -1,92 +1,124 @@
-# Отчёт по нагрузочному тестированию
+# Load Testing Report
 
-- **Версия сервиса:** текущая master-ветка
-- **Инструмент:** Vegeta v12
-- **Цель:** проверить стабильность автоматического назначения ревьюверов при RPS ≈ 5 (требование ТЗ)
+[🇷🇺 Русский](load-test-report.ru.md) | [🇬🇧 English](load-test-report.md)
 
-## Сценарий
+- **Service version:** current master branch
+- **Tool:** Vegeta v12
+- **Goal:** verify stability of automatic reviewer assignment at RPS ≈ 5 (requirement)
 
-1. Автоматически создаётся команда `load-team` с тремя активными участниками (lu1, lu2, lu3).
-2. Vegeta отправляет запросы на создание PR (`POST /pullRequest/create`) с заданной частотой.
-3. Каждый запрос использует уникальный `pull_request_id` (генерируется на основе `time.Now().UnixNano()`).
-4. Длительность — 60 секунд, rate — 5 req/s. Суммарно ≈ 300 запросов.
+## Table of Contents
 
-## Окружение
+- [Scenario](#scenario)
+- [Environment](#environment)
+- [Vegeta Installation](#vegeta-installation)
+- [Results](#results)
+- [Conclusions](#conclusions)
+- [Detailed Analysis](#detailed-analysis)
+  - [Performance](#performance)
+  - [Reliability](#reliability)
+  - [Scalability](#scalability)
+- [Repeating the Test](#repeating-the-test)
 
-- Huawei matebook D15, 16 ГБ RAM.
-- Сервис и PostgreSQL запущены через `docker compose up`.
-- Vegeta запущен локально через `make load-test` (см. `load/cli/main.go`).
+## Scenario
 
-## Установка Vegeta
+1. Automatically creates `load-team` with three active members (lu1, lu2, lu3).
+2. Vegeta sends requests to create PR (`POST /pullRequest/create`) at a given frequency.
+3. Each request uses a unique `pull_request_id` (generated based on `time.Now().UnixNano()`).
+4. Duration — 60 seconds, rate — 5 req/s. Total ≈ 300 requests.
+
+## Environment
+
+- Huawei matebook D15, 16 GB RAM.
+- Service and PostgreSQL started via `docker compose up`.
+- Vegeta run locally via `make load-test` (see `load/cli/main.go`).
+
+## Vegeta Installation
 
 ```bash
-# Установка через go install
+# Installation via go install
 go install github.com/tsenart/vegeta/v12@latest
 
-# Или использование через go run (встроено в проект)
+# Or use via go run (built into project)
 go run ./load/cli
 ```
 
-## Результаты
+## Results
 
-| Метрика                | Значение |
+| Metric                | Value |
 |------------------------|----------|
-| Средний RPS            | 4.9      |
+| Total requests         | 300      |
+| Average RPS            | 5.02     |
+| Throughput             | 5.02 req/s |
+| Duration (total)   | 59.807 s |
+| Duration (attack)  | 59.799 s |
+| Wait time  | 7.563 ms |
 | http_req_failed        | 0.0%     |
-| http_req_duration p(95)| 142 ms   |
-| http_req_duration p(99)| 188 ms   |
-| Время ответа max        | 231 ms   |
+| http_req_duration min  | 6.026 ms |
+| http_req_duration mean | 8.514 ms |
+| http_req_duration p(50)| 8.089 ms |
+| http_req_duration p(90)| 9.965 ms |
+| http_req_duration p(95)| 10.825 ms |
+| http_req_duration p(99)| 13.444 ms |
+| Max response time       | 64.201 ms |
+| Success rate           | 100.00%  |
+| Status Codes           | 201:300  |
+| Bytes In (total/mean)  | 70,124 / 233.75 |
+| Bytes Out (total/mean) | 39,860 / 132.87 |
 
-## Выводы
+## Conclusions
 
-- ✅ Сервис укладывается в целевой SLA 300 мс на 95-й перцентиль с запасом.
-- ✅ Ошибок уровня приложения и базы не зафиксировано.
-- ✅ Пиковое использование CPU контейнера приложения ≈ 8%, PostgreSQL ≈ 5%, что оставляет существенный запас для масштабирования.
-- ✅ Все запросы успешно обработаны (0% ошибок).
+- ✅ Service meets the target SLA of 300 ms at the 95th percentile with margin.
+- ✅ No application or database level errors recorded.
+- ✅ All requests successfully processed (100% success rate, 0% errors).
+- ✅ Average latency of 8.514 ms shows excellent performance.
+- ✅ Maximum latency of 64.201 ms is within SLA with large margin.
 
-## Детальный анализ
+## Detailed Analysis
 
-### Производительность
+### Performance
 
-- **Средняя задержка**: ~4 мс
-- **95-й перцентиль**: 142 мс (в 2 раза лучше SLA)
-- **99-й перцентиль**: 188 мс (в 1.6 раза лучше SLA)
-- **Максимальная задержка**: 231 мс (в пределах SLA)
+- **Minimum latency**: 6.026 ms
+- **Average latency**: 8.514 ms
+- **Median latency (p50)**: 8.089 ms
+- **90th percentile**: 9.965 ms
+- **95th percentile**: 10.825 ms (~28 times better than SLA 300 ms)
+- **99th percentile**: 13.444 ms (~22 times better than SLA 300 ms)
+- **Maximum latency**: 64.201 ms (~4.7 times better than SLA)
 
-### Надёжность
+**Latency over time:**
 
-- **Успешность запросов**: 100%
-- **Ошибки**: 0
-- **Конфликты**: 0 (благодаря уникальным PR ID)
+![Latency Graph](artifacts/vegeta-plot.png)
 
-### Масштабируемость
+The graph shows excellent stability after the initial startup spike. Latency quickly stabilizes below 10ms and remains consistently low throughout the test, with occasional minor spikes up to ~15ms, well within the SLA requirements.
 
-Текущие результаты показывают, что сервис может обрабатывать значительно больше нагрузки:
-- CPU использование: ~8% (запас ~12x)
-- Память: стабильное потребление без утечек
-- БД соединения: эффективное использование пула
+### Reliability
 
-## Рекомендации
+- **Request success rate**: 100%
+- **Errors**: 0
+- **Conflicts**: 0 (thanks to unique PR IDs)
 
-1. **Текущая конфигурация достаточна** для целевой нагрузки (5 RPS).
-2. **Масштабирование**: сервис может обрабатывать до 50-60 RPS без изменений архитектуры.
-3. **Мониторинг**: рекомендуется настроить алерты на 95-й перцентиль > 250 мс.
+### Scalability
 
-## Повторение теста
+Current results show that the service can handle significantly more load:
+- All requests processed in 59.8 seconds at 5 req/s load
+- Average response wait time: 7.563 ms
+- Throughput matches the specified load (5.02 req/s)
+- Stable performance throughout the test
 
-Для повторения теста выполните:
+## Repeating the Test
+
+To repeat the test, run:
 
 ```bash
-# Запуск полного цикла
+# Run full cycle
 make load-test
 
-# Просмотр отчёта
+# View report
 make load-test-report
 
-# Генерация графика (требует установки vegeta CLI)
+# Generate graph (requires vegeta CLI installation)
 go install github.com/tsenart/vegeta/v12@latest
 vegeta plot load/artifacts/results.bin > load/artifacts/plot.html
 ```
 
-Подробнее о нагрузочном тестировании см. `load/README.md`.
-
+For more details on load testing, see `load/README.md`.

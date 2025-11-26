@@ -1,74 +1,104 @@
 # PR Reviewer Service
 
-Сервис автоматического назначения ревьюверов на Pull Request'ы для внутренних команд.
+[🇷🇺 Русский](README.ru.md) | [🇬🇧 English](README.md)
 
-## Основные возможности
+Service for automatic assignment of reviewers to Pull Requests for internal teams.
 
-- Управление командами и участниками (`/team/add`, `/team/get`, `/users/setIsActive`).
-- Создание PR с автоподбором до двух активных ревьюверов из команды автора.
-- Переназначение ревью (замена на случайного активного участника команды заменяемого).
-- Идемпотентный merge и выдача списка PR по ревьюверу.
-- Дополнительные возможности:
-  - Статистика назначений (`/stats/assignments`).
-  - Массовая деактивация пользователей команды с безопасным переназначением (`/team/deactivate`).
-  - Нагрузочное тестирование (см. `load/load-test-report.md`).
-  - Интеграционный тест (пакет `test/integration`).
-  - Конфигурация линтера (`.golangci.yml`).
+## Table of Contents
 
-## 📚 API Документация
+- [Key Features](#key-features)
+- [API Documentation](#-api-documentation)
+  - [Main Endpoints](#main-endpoints)
+  - [Additional Endpoints](#additional-endpoints)
+- [Architecture](#architecture)
+  - [Technology Stack](#technology-stack)
+  - [Project Structure](#project-structure)
+  - [Application Layers](#application-layers)
+- [Quick Start](#quick-start)
+  - [Docker Compose (Recommended)](#docker-compose-recommended)
+  - [Local Run](#local-run)
+  - [Configuration and Environment Variables](#configuration-and-environment-variables)
+- [Development](#development)
+  - [Makefile Commands](#makefile-commands)
+  - [Manual Run](#manual-run)
+  - [Testing](#testing)
+    - [Unit Tests](#unit-tests)
+    - [Integration Tests](#integration-tests)
+- [Load Testing](#load-testing)
+- [Observability and Metrics](#observability-and-metrics)
+  - [Prometheus Metrics](#prometheus-metrics)
+  - [Monitoring](#monitoring)
+  - [Logging](#logging)
+- [Assumptions](#assumptions)
+- [Useful Links](#useful-links)
 
-Живую документацию можно посмотреть в Swagger UI: `http://localhost:8080/swagger` (используется `openapi.yml` из корня проекта).
+## Key Features
 
-### Основные эндпоинты
+- Team and member management (`/team/add`, `/team/get`, `/users/setIsActive`).
+- PR creation with automatic selection of up to two active reviewers from the author's team.
+- Review reassignment (replacement with a random active member from the replaced reviewer's team).
+- Idempotent merge and listing of PRs by reviewer.
+- Additional features:
+  - Assignment statistics (`/stats/assignments`).
+  - Mass deactivation of team members with safe reassignment (`/team/deactivate`).
+  - Load testing (see `load/load-test-report.md`).
+  - Integration test (package `test/integration`).
+  - Linter configuration (`.golangci.yml`).
 
-| Метод | Путь                  | Описание                                                              |
+## 📚 API Documentation
+
+Live documentation is available in Swagger UI: `http://localhost:8080/swagger` (uses `openapi.yml` from the project root).
+
+### Main Endpoints
+
+| Method | Path                  | Description                                                              |
 | ----- | --------------------- | --------------------------------------------------------------------- |
-| POST  | `/team/add`           | Создать команду с участниками (создаёт/обновляет пользователей)       |
-| GET   | `/team/get`           | Получить команду с участниками                                        |
-| POST  | `/users/setIsActive`  | Установить флаг активности пользователя                               |
-| GET   | `/users/getReview`    | Получить PR'ы, где пользователь назначен ревьювером                    |
-| POST  | `/pullRequest/create` | Создать PR и автоматически назначить до 2 ревьюверов из команды автора |
-| POST  | `/pullRequest/merge`  | Пометить PR как MERGED (идемпотентная операция)                       |
-| POST  | `/pullRequest/reassign` | Переназначить конкретного ревьювера на другого из его команды          |
+| POST  | `/team/add`           | Create a team with members (creates/updates users)       |
+| GET   | `/team/get`           | Get a team with members                                        |
+| POST  | `/users/setIsActive`  | Set user activity flag                               |
+| GET   | `/users/getReview`    | Get PRs where the user is assigned as a reviewer                    |
+| POST  | `/pullRequest/create` | Create a PR and automatically assign up to 2 reviewers from the author's team |
+| POST  | `/pullRequest/merge`  | Mark PR as MERGED (idempotent operation)                       |
+| POST  | `/pullRequest/reassign` | Reassign a specific reviewer to another from their team          |
 
-### Дополнительные эндпоинты
+### Additional Endpoints
 
-| Метод | Путь                | Описание                                                          |
+| Method | Path                | Description                                                          |
 | ----- | ------------------- | ----------------------------------------------------------------- |
-| POST  | `/team/deactivate`  | Массовая деактивация пользователей команды с безопасным переназначением |
-| GET   | `/stats/assignments` | Получить статистику назначений по пользователям и PR              |
-| GET   | `/health`           | Health check эндпоинт                                             |
-| GET   | `/metrics`           | Prometheus метрики                                                |
-| GET   | `/swagger`           | Swagger UI для интерактивной документации API                    |
+| POST  | `/team/deactivate`  | Mass deactivation of team members with safe reassignment |
+| GET   | `/stats/assignments` | Get assignment statistics by users and PRs              |
+| GET   | `/health`           | Health check endpoint                                             |
+| GET   | `/metrics`           | Prometheus metrics                                                |
+| GET   | `/swagger`           | Swagger UI for interactive API documentation                    |
 
-## Архитектура
+## Architecture
 
-### Технологический стек
+### Technology Stack
 
-- **Go 1.24.10** — язык программирования
-- **Chi v5** — HTTP роутер и middleware
-- **PostgreSQL 16** — основное хранилище данных
-- **pgx/v5** — драйвер PostgreSQL
-- **golang-migrate** — управление миграциями БД
-- **go-transaction-manager** — управление транзакциями
-- **Prometheus** — сбор метрик
-- **slog** — структурированное логирование
-- **Squirrel** — построитель SQL-запросов
+- **Go 1.24.10** — programming language
+- **Chi v5** — HTTP router and middleware
+- **PostgreSQL 16** — main data storage
+- **pgx/v5** — PostgreSQL driver
+- **golang-migrate** — database migration management
+- **go-transaction-manager** — transaction management
+- **Prometheus** — metrics collection
+- **slog** — structured logging
+- **Squirrel** — SQL query builder
 
-### Структура проекта
+### Project Structure
 
-Проект следует принципам Clean Architecture с разделением на слои:
+The project follows Clean Architecture principles with layer separation:
 
 ```
 pr-reviewer-service_Avito/
-├── cmd/run/              # Точка входа приложения
-├── config/               # YAML конфигурация
+├── cmd/run/              # Application entry point
+├── config/               # YAML configuration
 ├── internal/
-│   ├── app/              # Инициализация приложения, миграции, graceful shutdown
-│   ├── config/           # Загрузка и парсинг конфигурации (YAML + ENV)
-│   ├── domain/           # Доменные модели и ошибки
-│   ├── repository/       # Слой работы с БД (SQL-операции, транзакции)
-│   ├── service/          # Бизнес-логика, валидация, выбор ревьюверов
+│   ├── app/              # Application initialization, migrations, graceful shutdown
+│   ├── config/           # Configuration loading and parsing (YAML + ENV)
+│   ├── domain/           # Domain models and errors
+│   ├── repository/       # Database layer (SQL operations, transactions)
+│   ├── service/          # Business logic, validation, reviewer selection
 │   ├── http/
 │   │   ├── handler/      # Feature-based HTTP handlers
 │   │   │   ├── add_team/
@@ -80,226 +110,226 @@ pr-reviewer-service_Avito/
 │   │   │   ├── user_set_activity/
 │   │   │   ├── user_get_review/
 │   │   │   ├── stats_assignments/
-│   │   │   └── common/    # Общие утилиты (response, mappers)
+│   │   │   └── common/    # Common utilities (response, mappers)
 │   │   ├── middleware/    # HTTP middleware (logging, metrics, panic recovery)
-│   │   ├── router/       # Регистрация маршрутов
-│   │   └── swagger/       # Swagger UI интеграция
-│   ├── infrastructure/   # Инфраструктурные зависимости
-│   │   ├── nower/         # Абстракция времени (для тестирования)
-│   │   └── randomizer/   # Потокобезопасный рандомизатор
-│   ├── logging/          # Структурированное логирование с контекстом
-│   └── metrics/          # Бизнес и технические метрики
-├── migrations/           # SQL миграции БД
-├── load/                 # Нагрузочное тестирование (Vegeta)
-├── test/integration/     # Интеграционные тесты (Testcontainers)
-├── deploy/               # Конфигурации для деплоя (Prometheus)
-└── metrics/              # Grafana дашборды
+│   │   ├── router/       # Route registration
+│   │   └── swagger/       # Swagger UI integration
+│   ├── infrastructure/   # Infrastructure dependencies
+│   │   ├── nower/         # Time abstraction (for testing)
+│   │   └── randomizer/   # Thread-safe randomizer
+│   ├── logging/          # Structured logging with context
+│   └── metrics/          # Business and technical metrics
+├── migrations/           # Database SQL migrations
+├── load/                 # Load testing (Vegeta)
+├── test/integration/     # Integration tests (Testcontainers)
+├── deploy/               # Deployment configurations (Prometheus)
+└── metrics/              # Grafana dashboards
 ```
 
-### Слои приложения
+### Application Layers
 
-1. **`internal/repository`** — слой работы с БД:
-   - Все SQL-операции через Squirrel и pgx
-   - Управление транзакциями через `go-transaction-manager`
-   - Разделение на `Storage` (основной) и `txStorage` (транзакционный)
+1. **`internal/repository`** — database layer:
+   - All SQL operations via Squirrel and pgx
+   - Transaction management via `go-transaction-manager`
+   - Separation into `Storage` (main) and `txStorage` (transactional)
 
-2. **`internal/service`** — бизнес-логика:
-   - Валидация входных данных
-   - Случайный выбор ревьюверов (Fisher-Yates shuffle)
-   - Массовые операции в транзакциях
-   - Управление таймаутами операций
+2. **`internal/service`** — business logic:
+   - Input data validation
+   - Random reviewer selection (Fisher-Yates shuffle)
+   - Bulk operations in transactions
+   - Operation timeout management
 
-3. **`internal/http/handler`** — HTTP-слой:
-   - Feature-based структура (каждая фича в отдельном пакете)
-   - Централизованная обработка ошибок через `WithErrorHandling`
-   - Маппинг между API и доменными моделями
+3. **`internal/http/handler`** — HTTP layer:
+   - Feature-based structure (each feature in a separate package)
+   - Centralized error handling via `WithErrorHandling`
+   - Mapping between API and domain models
 
 4. **`internal/http/middleware`** — HTTP middleware:
-   - `PanicMiddleware` — перехват паник
-   - `LoggerMiddleware` — структурированное логирование с request ID
-   - `MetricsMiddleware` — сбор Prometheus метрик
+   - `PanicMiddleware` — panic recovery
+   - `LoggerMiddleware` — structured logging with request ID
+   - `MetricsMiddleware` — Prometheus metrics collection
 
-5. **`internal/app`** — инициализация:
-   - Применение миграций при старте
-   - Подключение к БД с повторными попытками
-   - Graceful shutdown с таймаутом
+5. **`internal/app`** — initialization:
+   - Migration application on startup
+   - Database connection with retries
+   - Graceful shutdown with timeout
 
-## Быстрый старт
+## Quick Start
 
-### Docker Compose (рекомендуется)
+### Docker Compose (Recommended)
 
 ```bash
-# Запустить все сервисы (app, postgres, prometheus, grafana)
+# Start all services (app, postgres, prometheus, grafana)
 docker compose up --build
 ```
 
-Сервис поднимется на `http://localhost:8080`, БД — на `localhost:5432`.  
-При старте автоматически применяются миграции из каталога `migrations`.
+The service will be available at `http://localhost:8080`, DB — at `localhost:5432`.  
+Migrations from the `migrations` directory are automatically applied on startup.
 
-### Локальный запуск
+### Local Run
 
 ```bash
-# 1. Запустить PostgreSQL
+# 1. Start PostgreSQL
 docker compose up db -d
 
-# 2. Собрать и запустить приложение
+# 2. Build and run the application
 make build
 ./bin/pr-reviewer
 
-# Или напрямую
+# Or directly
 make run
 ```
 
-### Конфигурация и переменные окружения
+### Configuration and Environment Variables
 
-Базовый конфиг хранится в `config/config.yaml`. Можно указать другой файл через `CONFIG_PATH`.  
-Любое значение из YAML можно переопределить переменными окружения.
+Base config is stored in `config/config.yaml`. You can specify another file via `CONFIG_PATH`.  
+Any value from YAML can be overridden with environment variables.
 
-| Переменная | Значение по умолчанию | Описание |
+| Variable | Default Value | Description |
 |-----------|-----------------------|----------|
-| `CONFIG_PATH` | `config/config.yaml` | Путь до YAML-файла с конфигом |
-| `HTTP_PORT` | `8080` | Порт HTTP-сервера |
-| `HTTP_READ_TIMEOUT` | `5s` | Таймаут чтения HTTP |
-| `HTTP_WRITE_TIMEOUT` | `5s` | Таймаут записи ответа |
-| `HTTP_IDLE_TIMEOUT` | `5m` | Idle-таймаут keep-alive |
-| `DATABASE_URL` | `postgres://...` | Строка подключения к PostgreSQL |
-| `DB_MAX_CONNECTIONS` | `50` | Максимум соединений в пуле |
-| `DB_MIN_CONNECTIONS` | `5` | Минимум соединений |
-| `DB_MAX_CONN_IDLE_TIME` | `5m` | Idle timeout соединения |
-| `DB_MAX_CONN_LIFETIME` | `30m` | TTL соединения |
-| `MIGRATIONS_PATH` | `migrations` | Путь до SQL-миграций |
-| `SHUTDOWN_TIMEOUT` | `10s` | Время на graceful shutdown |
-| `OPERATION_TIMEOUT` | `30s` | Таймаут обычных операций |
-| `LONG_OPERATION_TIMEOUT` | `60s` | Таймаут длинных операций |
-| `LOG_LEVEL` | `info` | Уровень логирования (debug/info/warn/error) |
-| `LOG_OUTPUT` | `stdout` | `stdout`, `stderr` или путь к файлу |
-| `SWAGGER_SPEC_PATH` | `openapi.yml` | Путь до OpenAPI-файла |
+| `CONFIG_PATH` | `config/config.yaml` | Path to YAML config file |
+| `HTTP_PORT` | `8080` | HTTP server port |
+| `HTTP_READ_TIMEOUT` | `5s` | HTTP read timeout |
+| `HTTP_WRITE_TIMEOUT` | `5s` | HTTP write timeout |
+| `HTTP_IDLE_TIMEOUT` | `5m` | Keep-alive idle timeout |
+| `DATABASE_URL` | `postgres://...` | PostgreSQL connection string |
+| `DB_MAX_CONNECTIONS` | `50` | Maximum connections in pool |
+| `DB_MIN_CONNECTIONS` | `5` | Minimum connections |
+| `DB_MAX_CONN_IDLE_TIME` | `5m` | Connection idle timeout |
+| `DB_MAX_CONN_LIFETIME` | `30m` | Connection TTL |
+| `MIGRATIONS_PATH` | `migrations` | Path to SQL migrations |
+| `SHUTDOWN_TIMEOUT` | `10s` | Graceful shutdown time |
+| `OPERATION_TIMEOUT` | `30s` | Regular operation timeout |
+| `LONG_OPERATION_TIMEOUT` | `60s` | Long operation timeout |
+| `LOG_LEVEL` | `info` | Logging level (debug/info/warn/error) |
+| `LOG_OUTPUT` | `stdout` | `stdout`, `stderr` or file path |
+| `SWAGGER_SPEC_PATH` | `openapi.yml` | Path to OpenAPI file |
 
-## Разработка
+## Development
 
-### Makefile команды
+### Makefile Commands
 
-| Команда | Описание |
+| Command | Description |
 |---------|----------|
-| `make fmt` | Отформатировать код приложения (go fmt) |
-| `make lint` | Запустить линтеры для поиска ошибок и багов |
-| `make lint-fix` | Запустить линтеры с автоматическим исправлением |
-| `make test` | Запустить все тесты |
-| `make test-clean` | Очистить кэш тестов и запустить заново |
-| `make build` | Собрать бинарник приложения |
-| `make run` | Запустить приложение локально |
-| `make compose-up` | Поднять docker-контейнеры |
-| `make compose-down` | Остановить docker-контейнеры |
-| `make quick-setup` | Быстрая настройка (только поднятие контейнеров) |
-| `make full-setup` | Полная настройка (форматирование, линтеры, контейнеры) |
-| `make load-test` | Запустить нагрузочное тестирование |
-| `make load-test-setup` | Только подготовка окружения для load test |
-| `make load-test-report` | Показать отчёт из сохранённых результатов |
-| `make load-test-plot` | Показать инструкцию по генерации графика |
-| `make tidy` | Синхронизировать зависимости (go mod tidy) |
-| `make generate` | Перегенерировать DTO из `openapi.yml` (oapi-codegen) |
-| `make go-generate` | Запустить все go:generate команды |
-| `make install-tools` | Установить инструменты разработки (golangci-lint, oapi-codegen, goimports) |
+| `make fmt` | Format application code (go fmt) |
+| `make lint` | Run linters to find errors and bugs |
+| `make lint-fix` | Run linters with automatic fixes |
+| `make test` | Run all tests |
+| `make test-clean` | Clear test cache and run again |
+| `make build` | Build application binary |
+| `make run` | Run application locally |
+| `make compose-up` | Start docker containers |
+| `make compose-down` | Stop docker containers |
+| `make quick-setup` | Quick setup (only start containers) |
+| `make full-setup` | Full setup (formatting, linters, containers) |
+| `make load-test` | Run load testing |
+| `make load-test-setup` | Only prepare environment for load test |
+| `make load-test-report` | Show report from saved results |
+| `make load-test-plot` | Show instructions for graph generation |
+| `make tidy` | Sync dependencies (go mod tidy) |
+| `make generate` | Regenerate DTOs from `openapi.yml` (oapi-codegen) |
+| `make go-generate` | Run all go:generate commands |
+| `make install-tools` | Install development tools (golangci-lint, oapi-codegen, goimports) |
 
-### Ручной запуск
+### Manual Run
 
 ```bash
-# Форматирование
+# Formatting
 go fmt ./...
 
-# Тесты
+# Tests
 go test ./...
 
-# Линтер
+# Linter
 golangci-lint run ./...
 
-# Сборка
+# Build
 go build -o bin/pr-reviewer ./cmd/run
 ```
 
-### Тестирование
+### Testing
 
-#### Unit тесты
+#### Unit Tests
 
 ```bash
-# Все тесты
+# All tests
 make test
 
-# Конкретный пакет
+# Specific package
 go test ./internal/service/...
 
-# С покрытием
+# With coverage
 go test -cover ./...
 ```
 
-#### Интеграционные тесты
+#### Integration Tests
 
-Файл `test/integration/integration_test.go` разворачивает PostgreSQL через Testcontainers (на Windows тест пропускается) и прогоняет сквозной сценарий: команда → PR → реассайн → merge → массовая деактивация.
+The `test/integration/integration_test.go` file spins up PostgreSQL via Testcontainers (skipped on Windows) and runs an end-to-end scenario: team → PR → reassign → merge → mass deactivation.
 
 ```bash
 go test ./test/integration -run TestHappyPath -v
 ```
 
-## Нагрузочное тестирование
+## Load Testing
 
-Используется библиотека [Vegeta](https://github.com/tsenart/vegeta) для нагрузочного тестирования.  
-Реализовано как Go-программа в `load/cli/`, подробности — в `load/README.md`.  
-Краткие результаты — в `load/load-test-report.md`. При RPS≈5 сервис уверенно держит SLA 300 мс.
+The [Vegeta](https://github.com/tsenart/vegeta) library is used for load testing.  
+Implemented as a Go program in `load/cli/`, details — in `load/README.md`.  
+Brief results — in `load/load-test-report.md`. At RPS≈5, the service confidently maintains SLA 300 ms.
 
-**Быстрый запуск:**
+**Quick start:**
 ```bash
 make load-test
-# или
+# or
 go run ./load/cli
 ```
 
-Подробнее см. `load/README.md`.
+For more details, see `load/README.md`.
 
-## Наблюдаемость и метрики
+## Observability and Metrics
 
-### Метрики Prometheus
+### Prometheus Metrics
 
-Эндпоинт `/metrics` предоставляет:
+The `/metrics` endpoint provides:
 
-**Технические метрики:**
-- `http_requests_total` — общее количество HTTP запросов (по method, endpoint, status)
-- `http_request_duration_seconds` — гистограмма длительности запросов
-- `http_request_size_bytes` — размер тела запроса
+**Technical metrics:**
+- `http_requests_total` — total number of HTTP requests (by method, endpoint, status)
+- `http_request_duration_seconds` — request duration histogram
+- `http_request_size_bytes` — request body size
 
-**Бизнес-метрики:**
-- `teams_created_total` — количество созданных команд
-- `users_processed_total` — количество обработанных пользователей
-- `pull_requests_created_total` — количество созданных PR
-- `reviewer_reassignments_total` — количество переназначений ревьюверов
+**Business metrics:**
+- `teams_created_total` — number of teams created
+- `users_processed_total` — number of users processed
+- `pull_requests_created_total` — number of PRs created
+- `reviewer_reassignments_total` — number of reviewer reassignments
 
-### Мониторинг
+### Monitoring
 
-`docker compose up` поднимает:
-- **Prometheus** (`http://localhost:9090`). Конфиг — `deploy/prometheus/prometheus.yml`.
-- **Grafana** (`http://localhost:3000`). Учётные данные: `admin/admin`. Импортируйте дашборд `metrics/grafana/pr-reviewer-dashboard.json`.
+`docker compose up` starts:
+- **Prometheus** (`http://localhost:9090`). Config — `deploy/prometheus/prometheus.yml`.
+- **Grafana** (`http://localhost:3000`). Credentials: `admin/admin`. Import the dashboard `metrics/grafana/pr-reviewer-dashboard.json`.
 
-### Логирование
+### Logging
 
-Логи структурированы (slog) и содержат:
-- Request ID (уникальный для каждого запроса)
-- Путь запроса
-- HTTP метод
-- Статус код ответа
-- Длительность обработки
+Logs are structured (slog) and contain:
+- Request ID (unique for each request)
+- Request path
+- HTTP method
+- Response status code
+- Processing duration
 
-Поведение управляется переменными `LOG_LEVEL` и `LOG_OUTPUT`.
+Behavior is controlled by `LOG_LEVEL` and `LOG_OUTPUT` variables.
 
-## Принятые допущения
+## Assumptions
 
-- `team/add` возвращает ошибку `TEAM_EXISTS`, если команда уже есть, но пользователей всё равно можно обновлять через отдельные эндпоинты.
-- При массовой деактивации, если в команде не осталось активных ревьюверов, слот освобождается (согласно правилу "можно назначить меньше двух").
-- Рандомизация выборов ревьюверов использует генератор `math/rand`, достаточный для равномерного распределения нагрузки внутри одной команды. Для криптостойкости можно заменить на `crypto/rand`.
-- Интеграционный тест пропускается на Windows, где недоступен базовый Docker rootless режим. В CI/Linux тест выполняется полностью.
-- Все операции с БД выполняются через транзакции для обеспечения консистентности данных.
+- `team/add` returns `TEAM_EXISTS` error if the team already exists, but users can still be updated via separate endpoints.
+- During mass deactivation, if no active reviewers remain in the team, the slot is freed (according to the rule "can assign less than two").
+- Randomization of reviewer selection uses `math/rand` generator, sufficient for uniform load distribution within a team. For cryptographic security, can be replaced with `crypto/rand`.
+- Integration test is skipped on Windows, where basic Docker rootless mode is unavailable. In CI/Linux, the test runs fully.
+- All database operations are performed via transactions to ensure data consistency.
 
-## Полезные ссылки
+## Useful Links
 
-- [OpenAPI спецификация](openapi.yml)
-- [Миграции БД](migrations)
-- [Отчёт по нагрузочному тестированию](load/load-test-report.md)
-- [Документация по нагрузочному тестированию](load/README.md)
+- [OpenAPI specification](openapi.yml)
+- [Database migrations](migrations)
+- [Load testing report](load/load-test-report.md)
+- [Load testing documentation](load/README.md)
